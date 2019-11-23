@@ -97,6 +97,26 @@ export class Observable {
         });
     }
 
+    take(number) {
+        return new Observable(observer => {
+            let counter = 0;
+            const sub =  this.forEach({
+                next(data) {
+                    counter++;
+                    if (number >= counter) {
+                        observer.next(data);
+                    } else {
+                        observer.complete();
+                        sub.unsubscribe();
+                    }
+                },
+                complete: observer.complete,
+                error: observer.error,
+            });
+            return sub;
+        })
+    }
+
     reduce() {
         // TODO
     }
