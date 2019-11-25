@@ -1,3 +1,5 @@
+const noop = () => {};
+
 export class Observable {
     constructor(forEach) {
         if (typeof forEach !== 'function') {
@@ -6,6 +8,16 @@ export class Observable {
                 'invoked with a function as parameter, got ' + typeof forEach);
         }
         this._forEach = forEach;
+    }
+
+    static wrap(x) {
+        return new Observable(observer => {
+            observer.next(x);
+            observer.complete();
+            return {
+                unsubscribe() {}
+            }
+        });
     }
 
     static fromEvent(domNode, eventName) {
@@ -18,6 +30,7 @@ export class Observable {
 
             return {
                 unsubscribe() {
+                    // TODO: handle sequential unsubscribing
                     observer.complete();
                     domNode.removeEventListener(eventName, handler);
                 }
@@ -34,6 +47,7 @@ export class Observable {
 
             return {
                 unsubscribe() {
+                    // TODO: handle sequential unsubscribing
                     clearInterval(id);
                     observer.complete();
                 }
@@ -49,16 +63,14 @@ export class Observable {
             const observer = args[0];
             return this._forEach({
                 next: observer.next,
-                error: observer.error,
-                complete: observer.complete,
+                error: observer.error || noop,
+                complete: observer.complete || noop,
             });
         } else if (
-            args.length === 3
+            args.length === 1
             && typeof args[0] === 'function'
-            && typeof args[1] === 'function'
-            && typeof args[2] === 'function'
         ) {
-            const [next, error, complete] = args;
+            const [next, error = noop, complete = noop] = args;
             return this._forEach({
                 next,
                 error,
@@ -106,7 +118,6 @@ export class Observable {
                     if (number >= counter) {
                         observer.next(data);
                     } else {
-                        observer.complete();
                         sub.unsubscribe();
                     }
                 },
@@ -114,7 +125,22 @@ export class Observable {
                 error: observer.error,
             });
             return sub;
-        })
+        });
+    }
+
+    merge() {
+        return new Observable(observer => {
+            const sub = this.forEach({
+                next(innerObservable) {
+                    innerObservable.forEach(
+                        observer.next
+                    );
+                },
+                complete: observer.complete,
+                error: observer.error,
+            });
+            return sub;
+        });
     }
 
     reduce() {
@@ -130,10 +156,6 @@ export class Observable {
     }
 
     concatAll() {
-        // TODO
-    }
-
-    mergeAll() {
         // TODO
     }
 
